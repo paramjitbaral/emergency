@@ -1,0 +1,44 @@
+{
+  "H2": {
+    "success": 101,
+    "fail": 205,
+    "avg": 0.3412473856209156,
+    "accepted": 101,
+    "rejected": 205
+  },
+  "H6": {
+    "success": 50,
+    "fail": 139,
+    "avg": 0.29966931216931275,
+    "accepted": 50,
+    "rejected": 139
+  },
+  "H5": {
+    "success": 109,
+    "fail": 173,
+    "avg": 0.38424858156028346,
+    "accepted": 109,
+    "rejected": 173
+  },
+  "H1": {
+    "success": 106,
+    "fail": 103,
+    "avg": 0.4164143540669854,
+    "accepted": 106,
+    "rejected": 103
+  },
+  "H3": {
+    "success": 93,
+    "fail": 151,
+    "avg": 0.3578348360655735,
+    "accepted": 93,
+    "rejected": 151
+  },
+  "H4": {
+    "success": 36,
+    "fail": 99,
+    "avg": 0.3568925925925922,
+    "accepted": 36,
+    "rejected": 99
+  }
+}

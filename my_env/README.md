@@ -1,0 +1,299 @@
+---
+title: ACDE OpenEnv
+emoji: "🚑"
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
+# Emergency Routing Simulation (ACDE)
+
+This project is a simulation environment for emergency ambulance routing.
+
+In simple terms:
+- A patient needs urgent care.
+- Several hospitals are available.
+- Each hospital has trade-offs (distance, traffic, ICU certainty, specialization).
+- Conditions can change while the ambulance is moving.
+- The agent must decide where to go, step by step.
+
+The goal is not to be perfect every time. The goal is to make realistic decisions under uncertainty.
+
+## What This Project Does
+
+This environment helps you test decision logic in situations where information is incomplete and time is limited.
+
+It supports three difficulty levels:
+- `acde_easy`
+- `acde_medium`
+- `acde_hard`
+
+As difficulty increases, uncertainty and penalties increase too.
+
+## How It Works (Simple Flow)
+
+Every episode follows this loop:
+
+1. The environment is reset with a seed and task.
+2. You get an observation:
+- Patient condition
+- Required specialization
+- Hospital list with visible signals
+3. The policy scores hospitals.
+4. One hospital is selected.
+5. The environment validates arrival using hidden checks.
+6. You receive outcome + reward.
+7. If not done, repeat until success or failure.
+
+## What Makes It Realistic
+
+This is not a static lookup problem. It includes realistic uncertainty:
+
+- Displayed ICU status can differ from actual ICU status.
+- Traffic can change between steps.
+- Hospital overload can change outcomes.
+- Specialist availability can fail at arrival.
+- A hospital that failed once may become usable later.
+
+The policy includes safety rules such as:
+- Immediate retry protection after rejection.
+- Cooldown handling for recently failed hospitals.
+- Exploration among top options (not blind random picks).
+
+## Project Layout
+
+Key files:
+
+- `app/environment/core.py`
+  - Main environment loop (`reset`, `step`, transition logic)
+- `app/environment/validation.py`
+  - Hidden validation checks (ICU, specialist, overload, outcome)
+- `app/environment/graders.py`
+  - Final scoring and pass/fail grading
+- `app/models/`
+  - Pydantic models for state, observation, reward, action
+- `app/server/app.py`
+  - FastAPI server endpoints
+- `inference.py`
+  - Local policy runner (CLI episodes)
+- `data/learning_memory.json`
+  - Rolling policy memory
+- `data/trajectory_history.jsonl`
+  - Per-step trajectory logs
+
+## API Endpoints
+
+When server mode is running:
+
+- `GET /health`
+- `POST /reset`
+- `POST /step`
+- `GET /state`
+
+## Action Space
+
+The agent sends one action per step as JSON:
+
+```json
+{
+  "step": 1,
+  "hospital_id": "H3",
+  "rationale": "short decision reason"
+}
+```
+
+Action fields:
+- `step` (int, >=1): must match current environment step
+- `hospital_id` (str): target hospital identifier
+- `rationale` (str, optional): policy explanation
+
+## Observation Space
+
+Each `reset()` and `step()` returns an observation with:
+- episode metadata: `episode_id`, `seed`, `task_id`, `scenario_name`, `scenario_difficulty`
+- patient state: `patient_condition`, `required_specialization`, remaining time fields
+- hospital list: `hospital_id`, `distance_km`, `icu`, `specialization`, `traffic`
+- routing history: visited/failed hospitals and failure reasons
+- hidden-state feedback: `last_arrival_outcome` summary (status/reason/suitability)
+- memory snapshot used by the baseline policy
+
+Core schema is defined by Pydantic models in:
+- `app/models/action.py`
+- `app/models/observation.py`
+- `app/models/state.py`
+- `app/models/reward.py`
+
+## Required Environment Variables
+
+Before running `inference.py`, define:
+- `API_BASE_URL`: API base URL for the OpenAI-compatible endpoint
+- `MODEL_NAME`: model name used for rationale generation
+- `HF_TOKEN`: API key/token
+
+Windows PowerShell example:
+
+```powershell
+$env:API_BASE_URL = "https://api-inference.huggingface.co/v1"
+$env:MODEL_NAME = "your-model-id"
+$env:HF_TOKEN = "your-token"
+```
+
+## Installation
+
+## 1) Prerequisites
+
+- Python 3.10+ (3.12 works)
+- `pip`
+
+## 2) Open a terminal in this folder
+
+Folder should be:
+- `my_env`
+
+## 3) Create and activate a virtual environment (recommended)
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+macOS/Linux:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+## 4) Install dependencies
+
+```bash
+pip install -e .
+```
+
+If editable install is not needed:
+
+```bash
+pip install .
+```
+
+## Running the Project
+
+## Option A: Run policy episodes directly (most common)
+
+Run one medium episode:
+
+```bash
+python inference.py --mode single --task acde_medium --episodes 1 --seed 555
+```
+
+Run 10 hard episodes:
+
+```bash
+python inference.py --mode single --task acde_hard --episodes 10 --seed 555
+```
+
+Run all levels in sequence:
+
+```bash
+python inference.py --mode full --episodes 3 --seed 555
+```
+
+If you run without `--task`, the script asks for level interactively.
+
+## Option B: Run as HTTP service
+
+Start API server:
+
+```bash
+uvicorn app.server.app:app --host 0.0.0.0 --port 7860
+```
+
+Health check:
+
+```bash
+curl http://127.0.0.1:7860/health
+```
+
+## Understanding Output
+
+During `inference.py` runs, you will see:
+
+- Scenario details
+- Hospital options and scores
+- Decision strategy text
+- Outcome per step (`ACCEPTED`, `PARTIAL`, `REJECTED`)
+- Final episode summary
+- Batch summary (success rate, average score, average steps)
+
+Example summary:
+
+```text
+Batch summary:
+  Success rate: 20.0%
+  Average score: 0.39
+  Average steps: 3.6
+```
+
+## Data Files
+
+The simulation writes data to `data/`:
+
+- `learning_memory.json`
+  - Long-term policy memory
+- `trajectory_history.jsonl`
+  - One JSON object per step
+- `learning_archive.json`
+  - Aggregate run history and profiles
+
+If you want a clean run baseline, back up and clear these files.
+
+## Typical Targets (Guideline)
+
+These are practical targets, not strict rules:
+
+- Easy: usually high success, often fewer steps
+- Medium: mixed outcomes with meaningful rerouting
+- Hard: lower success, more failures, more steps
+
+If hard success is too high, increase uncertainty or rejection pressure.
+If hard success is too low, ease one or two hard-only probabilities.
+
+## Troubleshooting
+
+## "NameError" or model field errors
+
+Make sure model fields and observation fields match after logic changes.
+If you added new state keys, also add them in observation models.
+
+## Script asks for seed/level unexpectedly
+
+Pass flags explicitly:
+
+```bash
+python inference.py --mode single --task acde_hard --episodes 10 --seed 555
+```
+
+## No module named app
+
+Run commands from inside `my_env` folder, and ensure install succeeded:
+
+```bash
+pip install -e .
+```
+
+## Uvicorn command not found
+
+Install server deps in your active environment:
+
+```bash
+pip install uvicorn fastapi
+```
+
+## Notes
+
+- This project is designed for iterative policy tuning.
+- Small changes in hard-mode probabilities can noticeably shift success rates.
+- Always test with at least 10-30 episodes before concluding behavior changes.
