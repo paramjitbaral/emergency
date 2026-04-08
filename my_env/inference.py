@@ -36,7 +36,9 @@ BASE_SPEED_KMH = 60.0
 TRAFFIC_FACTOR = {"low": 1.0, "medium": 0.6, "high": 0.3}
 LEARNING_ARCHIVE_PATH = Path(__file__).resolve().parent / "data" / "learning_archive.json"
 LEARNING_ARCHIVE_VERSION = 2
-REQUIRED_ENV_VARS = ("API_BASE_URL", "MODEL_NAME", "HF_TOKEN")
+DEFAULT_API_BASE_URL = "https://api-inference.huggingface.co/v1"
+DEFAULT_MODEL_NAME = "Qwen/Qwen2.5-72B-Instruct"
+REQUIRED_ENV_VARS = ("HF_TOKEN",)
 
 
 def parse_args() -> argparse.Namespace:
@@ -60,7 +62,11 @@ def emit_structured(tag: str, payload: dict) -> None:
 
 
 def runtime_llm_config() -> dict[str, str]:
-    return {name: os.getenv(name, "").strip() for name in REQUIRED_ENV_VARS}
+    return {
+        "API_BASE_URL": os.getenv("API_BASE_URL", DEFAULT_API_BASE_URL).strip(),
+        "MODEL_NAME": os.getenv("MODEL_NAME", DEFAULT_MODEL_NAME).strip(),
+        "HF_TOKEN": os.getenv("HF_TOKEN", "").strip(),
+    }
 
 
 def require_llm_config() -> tuple[object, str]:
@@ -70,7 +76,7 @@ def require_llm_config() -> tuple[object, str]:
         raise SystemExit(
             "Missing required environment variables: "
             + ", ".join(missing)
-            + ". Set API_BASE_URL, MODEL_NAME, and HF_TOKEN before running inference.py"
+            + ". Set HF_TOKEN before running inference.py"
         )
     if OpenAI is None:
         raise SystemExit("openai package is required for inference.py LLM rationale generation.")
