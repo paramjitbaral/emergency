@@ -1,0 +1,25 @@
+# Python generated files
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv_test/
+
+# Packaging / build outputs
+*.egg-info/
+dist/
+build/
+
+# Benchmark and test logs
+benchmark_*.log
+pre_submission_inference_*.log
+tmp_inference_check.log
+
+# Stored generated data
+my_env/data/*.json
+my_env/data/*.jsonl
+
+# Local editor settings
+.vscode/

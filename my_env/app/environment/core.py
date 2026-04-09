@@ -30,6 +30,9 @@ TASKS = {
     },
 }
 
+MIN_REWARD = 0.001
+MAX_REWARD = 0.999
+
 OUTCOME_SCORE = {"accepted": 3, "partial": 2, "rejected": 1}
 CONDITION_ORDER = ["stable", "serious", "unstable", "critical"]
 
@@ -94,8 +97,8 @@ class EmergencyEnv:
             selected_hospital_id=None,
             done=False,
             final_outcome=None,
-            reward=0.0,
-            final_score=0.0,
+            reward=MIN_REWARD,
+            final_score=MIN_REWARD,
             ambulance_status="en_route",
             current_location_context="incident_site",
             visited_hospitals=[],
@@ -120,14 +123,14 @@ class EmergencyEnv:
             task_id=resolved_task_id,
             difficulty=difficulty,
             objective=TASKS[resolved_task_id]["objective"],
-            progress_score=0.0,
+            progress_score=MIN_REWARD,
             reward_model=RewardModel(
-                value=0.0,
+                value=MIN_REWARD,
                 breakdown=RewardBreakdown(
-                    survival_component=0.0,
-                    time_efficiency_component=0.0,
-                    specialization_component=0.0,
-                    delay_penalty=0.0,
+                    survival_component=MIN_REWARD,
+                    time_efficiency_component=MIN_REWARD,
+                    specialization_component=MIN_REWARD,
+                    delay_penalty=MIN_REWARD,
                 ),
             ),
             grader=None,
@@ -152,7 +155,7 @@ class EmergencyEnv:
             info = self.last_info.model_dump() if self.last_info else {}
             return {
                 "observation": self._build_observation(),
-                "reward": 0.0,
+                "reward": MIN_REWARD,
                 "done": True,
                 "info": info,
             }
@@ -439,14 +442,14 @@ class EmergencyEnv:
             - traffic_penalty
             - hidden_case_penalty
         )
-        reward = max(0.0, min(1.0, reward))
+        reward = max(MIN_REWARD, min(MAX_REWARD, reward))
 
         breakdown = RewardBreakdown(
-            survival_component=max(0.0, min(1.0, (status_reward + 0.5) / 1.5)),
-            time_efficiency_component=max(0.0, min(1.0, 1.0 - (travel_time / 25.0))),
-            specialization_component=(1.0 if self._specialization_match(selected) else 0.4),
+            survival_component=max(MIN_REWARD, min(MAX_REWARD, (status_reward + 0.5) / 1.5)),
+            time_efficiency_component=max(MIN_REWARD, min(MAX_REWARD, 1.0 - (travel_time / 25.0))),
+            specialization_component=(MAX_REWARD if self._specialization_match(selected) else 0.4),
             delay_penalty=min(
-                1.0,
+                MAX_REWARD,
                 unknown_critical_penalty
                 + repeat_penalty
                 + failed_repeat_penalty
@@ -1103,19 +1106,19 @@ class EmergencyEnv:
         if not self.trajectory:
             return 0.0
         raw = sum(float(t["reward"]) for t in self.trajectory) / len(self.trajectory)
-        return max(0.0, min(1.0, raw))
+        return max(MIN_REWARD, min(MAX_REWARD, raw))
 
     def _failure_score(self) -> float:
         assert self.state_data is not None
         progress_component = self._progress_score()
-        reward_component = max(0.0, min(1.0, self.state_data.reward))
+        reward_component = max(MIN_REWARD, min(MAX_REWARD, self.state_data.reward))
         score = 0.15 + (0.35 * reward_component) + (0.25 * progress_component)
         return max(0.1, min(0.85, score))
 
     def _success_score(self) -> float:
         assert self.state_data is not None
         progress_component = self._progress_score()
-        reward_component = max(0.0, min(1.0, self.state_data.reward))
+        reward_component = max(MIN_REWARD, min(MAX_REWARD, self.state_data.reward))
         total_steps = max(1, len(self.trajectory))
         rejected_steps = sum(1 for item in self.trajectory if item.get("outcome_status") == "rejected")
         route_quality = max(0.0, 1.0 - (rejected_steps / total_steps))

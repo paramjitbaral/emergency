@@ -14,6 +14,7 @@ MEMORY_FILE = ROOT / "data" / "learning_memory.json"
 
 app = FastAPI(title="Adaptive Crisis Decision Environment", version="1.0.0")
 env = ACDEEnvironment(memory_file=str(MEMORY_FILE))
+MIN_REWARD = 0.001
 
 
 class ResetRequest(BaseModel):
@@ -55,7 +56,7 @@ def reset(payload: ResetRequest | None = None) -> StepResponse:
     task_id = payload.task_id if payload else None
     obs = env.reset(seed=seed, task_id=task_id)
     info = env.last_info.model_dump() if env.last_info else {}
-    return StepResponse(observation=obs, reward=0.0, done=False, info=info)
+    return StepResponse(observation=obs, reward=MIN_REWARD, done=False, info=info)
 
 
 @app.post("/step", response_model=StepResponse)
