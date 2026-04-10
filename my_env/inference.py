@@ -934,17 +934,7 @@ def run_episode(
     print(f"Required specialization: {observation['required_specialization']}")
     print("Objective: admit patient successfully (no fixed deadline window)")
     print("=" * 72)
-    emit_structured(
-        "START",
-        {
-            "task_id": task_id,
-            "seed": seed,
-            "difficulty": observation.get("scenario_difficulty"),
-            "scenario": observation.get("scenario_name"),
-            "patient_condition": observation.get("patient_condition"),
-            "required_specialization": observation.get("required_specialization"),
-        },
-    )
+    print(f"[START] task={task_id} env=acde-openenv model={model_name or 'none'}", flush=True)
 
     if learning_profile:
         print(
@@ -955,6 +945,7 @@ def run_episode(
             print(f"Best known route: {' -> '.join(learning_profile['best_actions'])}")
 
     total_reward = 0.0
+    all_rewards = []
     steps = 0
     done = False
     previous_policy_hospital_id: str | None = None
@@ -991,6 +982,7 @@ def run_episode(
         )
         next_obs_model = step_result["observation"]
         reward = float(step_result["reward"])
+        all_rewards.append(reward)
         done = bool(step_result["done"])
         info = step_result.get("info", {}) or {}
         next_observation = next_obs_model.model_dump()
@@ -1005,20 +997,8 @@ def run_episode(
         print(f"Outcome: {status}")
         print(f"Reason: {reason}")
         print(f"Reward: {reward:.3f}")
-        emit_structured(
-            "STEP",
-            {
-                "task_id": task_id,
-                "seed": seed,
-                "step": observation.get("step"),
-                "phase": observation.get("ambulance_status"),
-                "hospital_id": chosen["hospital_id"],
-                "strategy": strategy,
-                "status": status,
-                "reward": round(reward, 4),
-                "done": done,
-            },
-        )
+        error_val = str(info.get("last_action_error")) if info.get("last_action_error") else "null"
+        print(f"[STEP] step={observation.get('step')} action={chosen['hospital_id']} reward={reward:.2f} done={str(done).lower()} error={error_val}", flush=True)
 
         append_trajectory_log(
             {
@@ -1068,18 +1048,8 @@ def run_episode(
     print(f"  Total steps: {steps}")
     print(f"  Final score: {final_score:.3f}")
     print(f"  Average reward: {total_reward / max(1, steps):.3f}")
-    emit_structured(
-        "END",
-        {
-            "task_id": task_id,
-            "seed": seed,
-            "result": final_result,
-            "success": final_result == "SUCCESS",
-            "score": round(final_score, 4),
-            "steps": steps,
-            "average_reward": round(total_reward / max(1, steps), 4),
-        },
-    )
+    rewards_str = ",".join(f"{r:.2f}" for r in all_rewards)
+    print(f"[END] success={str(final_result == 'SUCCESS').lower()} steps={steps} score={final_score:.2f} rewards={rewards_str}", flush=True)
 
     return {
         "success": final_result == "SUCCESS",
